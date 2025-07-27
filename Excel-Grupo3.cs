@@ -12,6 +12,7 @@ namespace Excel
         private bool ignorarCambioCelda = false; //evitar cambios al seleccionar Celdas
         private string portapapelesTexto = "";
         private DataGridViewCell celdaCopiada = null;
+        private bool operacionEnProceso = false;
 
         public Form1()
         {
@@ -223,83 +224,158 @@ namespace Excel
 
         private void CBXOperaciones_SelectedIndexChanged(object sender, EventArgs e)
         {
+            if (operacionEnProceso)
+                return;
+
+            if (ignorarCambioCelda)
+                return;
+
             if (CBXOperaciones.SelectedIndex < 0)
                 return;
 
-            var seleccionadas = dgvdetalle.SelectedCells
-                .Cast<DataGridViewCell>()
-                .OrderBy(c => c.RowIndex)
-                .ThenBy(c => c.ColumnIndex)
-                .ToList();
+            operacionEnProceso = true;
 
-            var celdasValor = seleccionadas.Take(seleccionadas.Count - 1).ToList();
-            var celdaDestino = seleccionadas.Last();
-
-            List<double> valores = new List<double>();
-
-            foreach (var celda in celdasValor)
+            try
             {
-                string texto = celda.Value?.ToString().Replace("L.", "").Replace("$", "").Trim() ?? "";
+                var seleccionadas = dgvdetalle.SelectedCells
+                    .Cast<DataGridViewCell>()
+                    .OrderBy(c => c.RowIndex)
+                    .ThenBy(c => c.ColumnIndex)
+                    .ToList();
 
-                if (double.TryParse(texto, NumberStyles.Any, CultureInfo.InvariantCulture, out double numero) ||
-                    double.TryParse(texto, NumberStyles.Any, CultureInfo.CurrentCulture, out numero))
+                if (seleccionadas.Count < 2)
                 {
-                    valores.Add(numero);
+                    MessageBox.Show("Debes seleccionar al menos 2 celdas para realizar la operación.");
+                    return;
+                }
+
+                var celdasConNumeros = new List<DataGridViewCell>();
+                var celdasVacias = new List<DataGridViewCell>();
+
+                foreach (var celda in seleccionadas)
+                {
+                    string texto = celda.Value?.ToString().Replace("L.", "").Replace("$", "").Trim() ?? "";
+
+                    if (double.TryParse(texto, NumberStyles.Any, CultureInfo.InvariantCulture, out double numero) ||
+                        double.TryParse(texto, NumberStyles.Any, CultureInfo.CurrentCulture, out numero))
+                    {
+                        celdasConNumeros.Add(celda);
+                    }
+                    else
+                    {
+                        celdasVacias.Add(celda);
+                    }
+                }
+
+                if (celdasConNumeros.Count == 0)
+                {
+                    MessageBox.Show("No hay celdas con números válidos en la selección.");
+                    return;
+                }
+
+                DataGridViewCell celdaDestino = null;
+
+                if (celdasVacias.Count > 0)
+                {
+                    celdaDestino = celdasVacias.First();
                 }
                 else
                 {
-                    MessageBox.Show($"La celda en fila {celda.RowIndex + 1}, columna {celda.ColumnIndex} no contiene un número válido.");
+                    celdaDestino = seleccionadas.Last();
+                    if (celdasConNumeros.Contains(celdaDestino))
+                    {
+                        celdasConNumeros.Remove(celdaDestino);
+                    }
+                }
+
+                if (celdasConNumeros.Count == 0)
+                {
+                    MessageBox.Show("No hay suficientes celdas con números para realizar la operación.");
                     return;
                 }
-            }
 
-            string operacion = CBXOperaciones.SelectedItem?.ToString();
-            if (string.IsNullOrEmpty(operacion))
-            {
-                MessageBox.Show("Selecciona una operación válida.");
-                return;
-            }
-            if (valores.Count < 1)
-            {
-                MessageBox.Show("Debes seleccionar al menos una celda con números.");
-                return;
-            }
-
-            double resultado = 0;
-
-            switch (operacion)
-            {
-                case "Suma":
-                    resultado = valores.Sum();
-                    break;
-                case "Resta":
-                    resultado = valores[0];
-                    for (int i = 1; i < valores.Count; i++)
-                        resultado -= valores[i];
-                    break;
-                case "Multiplicación":
-                    resultado = 1;
-                    foreach (var v in valores)
-                        resultado *= v;
-                    break;
-                case "División":
-                    resultado = valores[0];
-                    for (int i = 1; i < valores.Count; i++)
+                List<double> valores = new List<double>();
+                foreach (var celda in celdasConNumeros)
+                {
+                    string texto = celda.Value?.ToString().Replace("L.", "").Replace("$", "").Trim() ?? "";
+                    if (double.TryParse(texto, NumberStyles.Any, CultureInfo.InvariantCulture, out double numero) ||
+                        double.TryParse(texto, NumberStyles.Any, CultureInfo.CurrentCulture, out numero))
                     {
-                        if (valores[i] == 0)
-                        {
-                            MessageBox.Show("No se puede dividir entre cero.");
-                            return;
-                        }
-                        resultado /= valores[i];
+                        valores.Add(numero);
                     }
-                    break;
-                default:
-                    MessageBox.Show("Operación no válida.");
-                    return;
-            }
+                }
 
-            celdaDestino.Value = resultado;
+                string operacion = CBXOperaciones.SelectedItem?.ToString();
+                if (string.IsNullOrEmpty(operacion))
+                {
+                    MessageBox.Show("Selecciona una operación válida.");
+                    return;
+                }
+
+                double resultado = 0;
+
+                switch (operacion)
+                {
+                    case "Suma":
+                        resultado = valores.Sum();
+                        break;
+                    case "Resta":
+                        resultado = valores[0];
+                        for (int i = 1; i < valores.Count; i++)
+                            resultado -= valores[i];
+                        break;
+                    case "Multiplicación":
+                        resultado = 1;
+                        foreach (var v in valores)
+                            resultado *= v;
+                        break;
+                    case "División":
+                        resultado = valores[0];
+                        for (int i = 1; i < valores.Count; i++)
+                        {
+                            if (valores[i] == 0)
+                            {
+                                MessageBox.Show("No se puede dividir entre cero.");
+                                return;
+                            }
+                            resultado /= valores[i];
+                        }
+                        break;
+                    default:
+                        MessageBox.Show("Operación no válida.");
+                        return;
+                }
+
+                string celdasUsadas = string.Join(", ", celdasConNumeros.Select(c =>
+                    $"{GetColumnName(c.ColumnIndex)}{c.RowIndex + 1}"));
+
+                string mensaje = $"Operación: {operacion}\n" +
+                                $"Celdas utilizadas: {celdasUsadas}\n" +
+                                $"Valores: {string.Join(", ", valores)}\n" +
+                                $"Resultado: {resultado}";
+
+                MessageBox.Show(mensaje, "Resultado de la Operación");
+
+                celdaDestino.Value = resultado;
+
+                
+                dgvdetalle.ClearSelection();
+                celdaDestino.Selected = true;
+                dgvdetalle.CurrentCell = celdaDestino;
+
+                
+                ignorarCambioCelda = true;
+                CBXOperaciones.SelectedIndex = 0; 
+                ignorarCambioCelda = false;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error en la operación: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                operacionEnProceso = false;
+            }
         }
 
         private void BtnLimpiar_Click(object sender, EventArgs e)
@@ -390,6 +466,14 @@ namespace Excel
             {
                 dgvdetalle.CurrentCell.Value = portapapelesTexto;
             }
+        }
+        private string GetColumnName(int columnIndex)
+        {
+            if (columnIndex == 0) return "No";
+
+            
+            char letra = (char)('A' + columnIndex - 1);
+            return letra.ToString();
         }
     }
 }
