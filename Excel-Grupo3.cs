@@ -9,7 +9,7 @@ namespace Excel
 {
     public partial class Form1 : Form
     {
-        private bool ignorarCambioCelda = false; //evitar cambios al seleccionar Celdas
+        private bool ignorarCambioCelda = false;
         private string portapapelesTexto = "";
         private DataGridViewCell celdaCopiada = null;
         private bool operacionEnProceso = false;
