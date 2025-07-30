@@ -16,6 +16,7 @@ namespace Excel
 
         public Form1()
         {
+
             InitializeComponent();
         }
 
@@ -32,6 +33,7 @@ namespace Excel
         {
             aggnum();
             CargarComboFuentes();
+
 
             foreach (DataGridViewRow fila in dgvdetalle.Rows)
             {
@@ -310,9 +312,6 @@ namespace Excel
                     return;
                 }
 
-                string celdasUsadas = string.Join(", ", celdasConNumeros.Select(c =>
-                    $"{GetColumnName(c.ColumnIndex)}{c.RowIndex + 1}"));
-
                 double resultado = 0;
 
                 switch (operacion)
@@ -332,39 +331,23 @@ namespace Excel
                         break;
                     case "División":
                         resultado = valores[0];
-
-                        // Validación para división por cero
                         for (int i = 1; i < valores.Count; i++)
                         {
-                            if (Math.Abs(valores[i]) < double.Epsilon) 
+                            if (valores[i] == 0)
                             {
-                                MessageBox.Show($"Error: División por cero detectada.\n\n" +
-                                              $"Valores utilizados: {string.Join(", ", valores)}\n" +
-                                              $"Celdas: {celdasUsadas}\n\n" +
-                                              $"El valor cero está en la posición {i + 1} de la operación.\n" +
-                                              $"No se puede dividir entre cero.",
-                                              "Error de División",
-                                              MessageBoxButtons.OK,
-                                              MessageBoxIcon.Error);
+                                MessageBox.Show("No se puede dividir entre cero.");
                                 return;
                             }
                             resultado /= valores[i];
-                        }
-
-                        if (double.IsInfinity(resultado) || double.IsNaN(resultado))
-                        {
-                            MessageBox.Show("Error: El resultado de la división no es válido (infinito o indeterminado).\n" +
-                                          "Verifique los valores ingresados.",
-                                          "Error de División",
-                                          MessageBoxButtons.OK,
-                                          MessageBoxIcon.Error);
-                            return;
                         }
                         break;
                     default:
                         MessageBox.Show("Operación no válida.");
                         return;
                 }
+
+                string celdasUsadas = string.Join(", ", celdasConNumeros.Select(c =>
+                    $"{GetColumnName(c.ColumnIndex)}{c.RowIndex + 1}"));
 
                 string mensaje = $"Operación: {operacion}\n" +
                                 $"Celdas utilizadas: {celdasUsadas}\n" +
@@ -375,12 +358,14 @@ namespace Excel
 
                 celdaDestino.Value = resultado;
 
+                
                 dgvdetalle.ClearSelection();
                 celdaDestino.Selected = true;
                 dgvdetalle.CurrentCell = celdaDestino;
 
+                
                 ignorarCambioCelda = true;
-                CBXOperaciones.SelectedIndex = 0;
+                CBXOperaciones.SelectedIndex = 0; 
                 ignorarCambioCelda = false;
             }
             catch (Exception ex)
@@ -400,7 +385,6 @@ namespace Excel
                 celda.Value = null;
             }
         }
-
         private void OrdenarCeldasSeleccionadas(bool ascendente)
         {
             var celdas = dgvdetalle.SelectedCells
@@ -412,6 +396,7 @@ namespace Excel
 
             if (celdas.Count == 0) return;
 
+            // Obtener los valores originales como texto limpio
             List<string> textos = celdas
                 .Select(c => c.Value.ToString().Replace("L.", "").Replace("$", "").Trim())
                 .ToList();
@@ -471,7 +456,7 @@ namespace Excel
             {
                 portapapelesTexto = dgvdetalle.CurrentCell.Value.ToString();
                 celdaCopiada = dgvdetalle.CurrentCell;
-                dgvdetalle.CurrentCell.Value = ""; 
+                dgvdetalle.CurrentCell.Value = ""; // Borra el contenido
             }
         }
 
@@ -482,11 +467,11 @@ namespace Excel
                 dgvdetalle.CurrentCell.Value = portapapelesTexto;
             }
         }
-
         private string GetColumnName(int columnIndex)
         {
             if (columnIndex == 0) return "No";
 
+            
             char letra = (char)('A' + columnIndex - 1);
             return letra.ToString();
         }
